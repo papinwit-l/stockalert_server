@@ -1,13 +1,94 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AlertCondition {
+  PRICE_ABOVE
+  PRICE_BELOW
+  PERCENT_UP
+  PERCENT_DOWN
+  VOLUME_SPIKE
+}
+
+enum NotifyMode {
+  ONCE
+  REPEAT
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  password   String
+  ntfyTopic  String
+  createdAt  DateTime @default(now())
+
+  watchlist     Watchlist[]
+  alerts        Alert[]
+}
+
+model Stock {
+  id               String    @id @default(cuid())
+  symbol           String    @unique
+  name             String
+  lastPrice        Float     @default(0)
+  prevClose        Float     @default(0)
+  dayChangePercent Float     @default(0)
+  volume           Float     @default(0)
+  avgVolume        Float     @default(0)
+  lastFetchedAt    DateTime?
+
+  watchlist Watchlist[]
+  alerts    Alert[]
+}
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  userId    String
+  stockId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stockId])
+}
+
+model Alert {
+  id              String         @id @default(cuid())
+  userId          String
+  stockId         String
+  condition       AlertCondition
+  threshold       Float
+  notifyMode      NotifyMode     @default(REPEAT)
+  buffer          Float          @default(1.0)
+  cooldown        Int?
+  isActive        Boolean        @default(true)
+  isArmed         Boolean        @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime       @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stock         Stock          @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+}
+
+model Notification {
+  id             String   @id @default(cuid())
+  alertId        String
+  message        String
+  priceAtTrigger Float
+  sent           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
 }

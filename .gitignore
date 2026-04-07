@@ -4,3 +4,5 @@ prisma/migrations/
 *.log
 
 /src/generated/prisma
+
+.claude/
