@@ -25,15 +25,17 @@ enum NotifyMode {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id         String   @id @default(cuid())
-  name       String
-  email      String   @unique
-  password   String
-  ntfyTopic  String
-  createdAt  DateTime @default(now())
+  id                   String    @id @default(cuid())
+  name                 String
+  email                String    @unique
+  password             String
+  ntfyTopic            String
+  resetToken           String?
+  resetTokenExpiresAt  DateTime?
+  createdAt            DateTime  @default(now())
 
-  watchlist     Watchlist[]
-  alerts        Alert[]
+  watchlist Watchlist[]
+  alerts    Alert[]
 }
 
 model Stock {
