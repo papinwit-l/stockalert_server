@@ -43,7 +43,9 @@ async function main() {
     // Start Express server
     app.listen(PORT, () => {
       console.log(`[Server] Running on http://localhost:${PORT}`);
-      console.log(`[Server] Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(
+        `[Server] Environment: ${process.env.NODE_ENV || "development"}`,
+      );
     });
 
     // Start the polling scheduler

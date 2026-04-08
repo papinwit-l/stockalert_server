@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -25,21 +26,21 @@ enum NotifyMode {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id                   String    @id @default(cuid())
-  name                 String
-  email                String    @unique
-  password             String
-  ntfyTopic            String
-  resetToken           String?
-  resetTokenExpiresAt  DateTime?
-  createdAt            DateTime  @default(now())
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                String
+  email               String    @unique
+  password            String
+  ntfyTopic           String
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+  createdAt           DateTime  @default(now())
 
   watchlist Watchlist[]
   alerts    Alert[]
 }
 
 model Stock {
-  id               String    @id @default(cuid())
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
   symbol           String    @unique
   name             String
   lastPrice        Float     @default(0)
@@ -54,9 +55,9 @@ model Stock {
 }
 
 model Watchlist {
-  id        String   @id @default(cuid())
-  userId    String
-  stockId   String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  stockId   String   @db.ObjectId
   createdAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -66,9 +67,9 @@ model Watchlist {
 }
 
 model Alert {
-  id              String         @id @default(cuid())
-  userId          String
-  stockId         String
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String         @db.ObjectId
+  stockId         String         @db.ObjectId
   condition       AlertCondition
   threshold       Float
   notifyMode      NotifyMode     @default(REPEAT)
@@ -85,8 +86,8 @@ model Alert {
 }
 
 model Notification {
-  id             String   @id @default(cuid())
-  alertId        String
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  alertId        String   @db.ObjectId
   message        String
   priceAtTrigger Float
   sent           Boolean  @default(false)

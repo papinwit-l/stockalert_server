@@ -6,15 +6,13 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "db:migrate": "npx prisma migrate dev",
     "db:push": "npx prisma db push",
-    "db:studio": "npx prisma studio",
+    "db:generate": "npx prisma generate",
     "db:seed": "node prisma/seed.js",
     "db:cleanup": "node src/utils/cleanup.js"
   },
   "dependencies": {
-    "@prisma/adapter-mariadb": "^7.6.0",
-    "@prisma/client": "^7.6.0",
+    "@prisma/client": "^6.19.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
@@ -24,6 +22,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
-    "prisma": "^7.6.0"
+    "prisma": "^6.19.0"
   }
 }
