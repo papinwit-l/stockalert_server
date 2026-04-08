@@ -1,6 +1,12 @@
 const prisma = require("../config/database");
 
-const VALID_CONDITIONS = ["PRICE_ABOVE", "PRICE_BELOW", "PERCENT_UP", "PERCENT_DOWN", "VOLUME_SPIKE"];
+const VALID_CONDITIONS = [
+  "PRICE_ABOVE",
+  "PRICE_BELOW",
+  "PERCENT_UP",
+  "PERCENT_DOWN",
+  "VOLUME_SPIKE",
+];
 const VALID_MODES = ["ONCE", "REPEAT"];
 
 const getAlerts = async (req, res) => {
@@ -32,22 +38,32 @@ const createAlert = async (req, res) => {
     } = req.body;
 
     if (!symbol || !condition || threshold === undefined) {
-      return res.status(400).json({ error: "symbol, condition, and threshold are required" });
+      return res
+        .status(400)
+        .json({ error: "symbol, condition, and threshold are required" });
     }
 
     if (!VALID_CONDITIONS.includes(condition)) {
-      return res.status(400).json({ error: `Invalid condition. Use: ${VALID_CONDITIONS.join(", ")}` });
+      return res.status(400).json({
+        error: `Invalid condition. Use: ${VALID_CONDITIONS.join(", ")}`,
+      });
     }
 
     if (!VALID_MODES.includes(notifyMode)) {
-      return res.status(400).json({ error: `Invalid notifyMode. Use: ${VALID_MODES.join(", ")}` });
+      return res
+        .status(400)
+        .json({ error: `Invalid notifyMode. Use: ${VALID_MODES.join(", ")}` });
     }
 
     const upperSymbol = symbol.toUpperCase().trim();
-    const stock = await prisma.stock.findUnique({ where: { symbol: upperSymbol } });
+    const stock = await prisma.stock.findUnique({
+      where: { symbol: upperSymbol },
+    });
 
     if (!stock) {
-      return res.status(404).json({ error: `Stock ${upperSymbol} not found. Add it to your watchlist first.` });
+      return res.status(404).json({
+        error: `Stock ${upperSymbol} not found. Add it to your watchlist first.`,
+      });
     }
 
     const alert = await prisma.alert.create({
@@ -75,9 +91,12 @@ const createAlert = async (req, res) => {
 const updateAlert = async (req, res) => {
   try {
     const { id } = req.params;
-    const { condition, threshold, notifyMode, buffer, cooldown, isActive } = req.body;
+    const { condition, threshold, notifyMode, buffer, cooldown, isActive } =
+      req.body;
 
-    const existing = await prisma.alert.findFirst({ where: { id, userId: req.userId } });
+    const existing = await prisma.alert.findFirst({
+      where: { id, userId: req.userId },
+    });
 
     if (!existing) {
       return res.status(404).json({ error: "Alert not found" });
@@ -98,7 +117,8 @@ const updateAlert = async (req, res) => {
       updateData.notifyMode = notifyMode;
     }
     if (buffer !== undefined) updateData.buffer = parseFloat(buffer);
-    if (cooldown !== undefined) updateData.cooldown = cooldown ? parseInt(cooldown) : null;
+    if (cooldown !== undefined)
+      updateData.cooldown = cooldown ? parseInt(cooldown) : null;
     if (isActive !== undefined) {
       updateData.isActive = isActive;
       if (isActive) updateData.isArmed = true;
@@ -123,7 +143,9 @@ const deleteAlert = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = await prisma.alert.findFirst({ where: { id, userId: req.userId } });
+    const existing = await prisma.alert.findFirst({
+      where: { id, userId: req.userId },
+    });
 
     if (!existing) {
       return res.status(404).json({ error: "Alert not found" });
@@ -138,4 +160,22 @@ const deleteAlert = async (req, res) => {
   }
 };
 
-module.exports = { getAlerts, createAlert, updateAlert, deleteAlert };
+const getActiveAlertCount = async (req, res) => {
+  try {
+    const count = await prisma.alert.count({
+      where: { userId: req.userId, isActive: true },
+    });
+    res.json({ count });
+  } catch (error) {
+    console.error("[Alerts] Count error:", error.message);
+    res.status(500).json({ error: "Failed to fetch alert count" });
+  }
+};
+
+module.exports = {
+  getAlerts,
+  createAlert,
+  updateAlert,
+  deleteAlert,
+  getActiveAlertCount,
+};
