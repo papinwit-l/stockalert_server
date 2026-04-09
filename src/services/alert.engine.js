@@ -57,7 +57,9 @@ function shouldRearm(stock, alert) {
     case "VOLUME_SPIKE":
       // Re-arm when volume drops below threshold * (1 - buffer%) * avgVolume
       if (stock.avgVolume === 0) return false;
-      return stock.volume < stock.avgVolume * alert.threshold * (1 - bufferFraction);
+      return (
+        stock.volume < stock.avgVolume * alert.threshold * (1 - bufferFraction)
+      );
 
     default:
       return false;
@@ -77,11 +79,45 @@ function isCooldownExpired(alert) {
 }
 
 /**
+ * Build a human-readable notification message
+ */
+function buildNotificationMessage(stock, alert) {
+  const conditionLabels = {
+    PRICE_ABOVE: "crossed above",
+    PRICE_BELOW: "dropped below",
+    PERCENT_UP: "up",
+    PERCENT_DOWN: "down",
+    VOLUME_SPIKE: "volume spike",
+  };
+
+  const label = conditionLabels[alert.condition] || alert.condition;
+  const changeSign = stock.dayChangePercent >= 0 ? "+" : "";
+
+  switch (alert.condition) {
+    case "PRICE_ABOVE":
+    case "PRICE_BELOW":
+      return `${stock.symbol} ${label} $${alert.threshold.toFixed(2)} at $${stock.lastPrice.toFixed(2)} (${changeSign}${stock.dayChangePercent.toFixed(2)}% today)`;
+
+    case "PERCENT_UP":
+    case "PERCENT_DOWN":
+      return `${stock.symbol} ${label} ${Math.abs(stock.dayChangePercent).toFixed(2)}% today at $${stock.lastPrice.toFixed(2)}`;
+
+    case "VOLUME_SPIKE":
+      const multiplier =
+        stock.avgVolume > 0 ? (stock.volume / stock.avgVolume).toFixed(1) : "?";
+      return `${stock.symbol} ${label} (${multiplier}x avg volume) at $${stock.lastPrice.toFixed(2)}`;
+
+    default:
+      return `${stock.symbol} alert triggered at $${stock.lastPrice.toFixed(2)}`;
+  }
+}
+
+/**
  * Main alert engine - runs every polling cycle
  * 1. Get all active alerts with their stock data
  * 2. Check disarmed alerts for re-arming
  * 3. Check armed alerts for condition match
- * 4. Fire notifications and update state
+ * 4. Deactivate/disarm FIRST, then send notification (prevent double-fire)
  */
 async function runAlertEngine() {
   console.log("\n[Alert Engine] Running check...");
@@ -117,7 +153,9 @@ async function runAlertEngine() {
           data: { isArmed: true },
         });
         rearmed++;
-        console.log(`  [Re-armed] ${stock.symbol} - ${alert.condition} @ ${alert.threshold}`);
+        console.log(
+          `  [Re-armed] ${stock.symbol} - ${alert.condition} @ ${alert.threshold}`,
+        );
       }
       continue; // don't check condition on the same cycle as re-arming
     }
@@ -128,32 +166,20 @@ async function runAlertEngine() {
     // --- STEP 3: Check condition ---
     if (!isConditionMet(stock, alert)) continue;
 
-    // --- STEP 4: Condition met! Fire notification ---
-    console.log(`  [TRIGGERED] ${stock.symbol} - ${alert.condition} @ ${alert.threshold} (price: $${stock.lastPrice})`);
+    // --- STEP 4: Condition met! ---
+    console.log(
+      `  [TRIGGERED] ${stock.symbol} - ${alert.condition} @ ${alert.threshold} (price: $${stock.lastPrice})`,
+    );
 
-    // Send ntfy notification
-    const sent = await sendStockAlert(alert.user.ntfyTopic, stock, alert);
-
-    // Save notification history
-    await prisma.notification.create({
-      data: {
-        alertId: alert.id,
-        message: `${stock.symbol} ${alert.condition} $${stock.lastPrice.toFixed(2)}`,
-        priceAtTrigger: stock.lastPrice,
-        sent,
-      },
-    });
-
-    // Update alert state
+    // Deactivate/disarm IMMEDIATELY (before sending ntfy)
+    // This prevents double-fire if overlapping poll cycles occur
     const updateData = {
       lastTriggeredAt: new Date(),
     };
 
     if (alert.notifyMode === "ONCE") {
-      // ONCE mode: deactivate after firing
       updateData.isActive = false;
     } else {
-      // REPEAT mode: disarm, wait for buffer re-arm
       updateData.isArmed = false;
     }
 
@@ -162,11 +188,26 @@ async function runAlertEngine() {
       data: updateData,
     });
 
+    // THEN send ntfy notification (safe now — alert is already deactivated)
+    const sent = await sendStockAlert(alert.user.ntfyTopic, stock, alert);
+
+    // Save notification history with readable message
+    const message = buildNotificationMessage(stock, alert);
+
+    await prisma.notification.create({
+      data: {
+        alertId: alert.id,
+        message,
+        priceAtTrigger: stock.lastPrice,
+        sent,
+      },
+    });
+
     fired++;
   }
 
   console.log(
-    `[Alert Engine] Done. Checked: ${alerts.length} | Fired: ${fired} | Re-armed: ${rearmed}`
+    `[Alert Engine] Done. Checked: ${alerts.length} | Fired: ${fired} | Re-armed: ${rearmed}`,
   );
 }
 

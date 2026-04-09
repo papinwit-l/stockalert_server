@@ -2,23 +2,35 @@ const NTFY_BASE_URL = process.env.NTFY_BASE_URL || "https://ntfy.sh";
 
 /**
  * Send a push notification via ntfy.sh
- * @param {string} topic - user's unique ntfy topic
- * @param {string} title - notification title
- * @param {string} message - notification body
- * @param {string} priority - "min", "low", "default", "high", "urgent"
- * @param {string[]} tags - emoji tags, e.g. ["chart_with_upwards_trend", "warning"]
+ * Retries once after 10s on 429 (rate limit)
  */
-async function sendNotification(topic, title, message, priority = "high", tags = []) {
+async function sendNotification(
+  topic,
+  title,
+  message,
+  priority = "high",
+  tags = [],
+) {
+  const url = `${NTFY_BASE_URL}/${topic}`;
+  const options = {
+    method: "POST",
+    headers: {
+      Title: title,
+      Priority: priority,
+      Tags: tags.join(","),
+    },
+    body: message,
+  };
+
   try {
-    const response = await fetch(`${NTFY_BASE_URL}/${topic}`, {
-      method: "POST",
-      headers: {
-        Title: title,
-        Priority: priority,
-        Tags: tags.join(","),
-      },
-      body: message,
-    });
+    let response = await fetch(url, options);
+
+    // Retry once on rate limit
+    if (response.status === 429) {
+      console.warn(`[ntfy] Rate limited, retrying in 10s...`);
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+      response = await fetch(url, options);
+    }
 
     if (!response.ok) {
       throw new Error(`ntfy error: ${response.status} ${response.statusText}`);

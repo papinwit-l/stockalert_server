@@ -5,6 +5,8 @@ const prisma = require("../config/database");
 
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL) || 5;
 
+let isRunning = false;
+
 /**
  * Check if US stock market is currently open
  * Market hours: Mon-Fri, 9:30 AM - 4:00 PM Eastern Time
@@ -14,7 +16,7 @@ function isMarketOpen() {
 
   // Convert to Eastern Time
   const et = new Date(
-    now.toLocaleString("en-US", { timeZone: "America/New_York" })
+    now.toLocaleString("en-US", { timeZone: "America/New_York" }),
   );
 
   const day = et.getDay(); // 0=Sun, 6=Sat
@@ -38,6 +40,7 @@ function isMarketOpen() {
 
 /**
  * Main polling cycle: fetch prices → run alert engine
+ * Guarded against overlapping runs
  */
 async function pollCycle() {
   if (!isMarketOpen()) {
@@ -45,9 +48,17 @@ async function pollCycle() {
     return;
   }
 
+  if (isRunning) {
+    console.log(`[Scheduler] Previous cycle still running, skipping`);
+    return;
+  }
+
+  isRunning = true;
   try {
     console.log(`\n${"=".repeat(50)}`);
-    console.log(`[Scheduler] Poll cycle started at ${new Date().toISOString()}`);
+    console.log(
+      `[Scheduler] Poll cycle started at ${new Date().toISOString()}`,
+    );
 
     // Step 1: Fetch latest prices
     await fetchAllPrices();
@@ -59,6 +70,8 @@ async function pollCycle() {
     console.log(`${"=".repeat(50)}`);
   } catch (error) {
     console.error(`[Scheduler] Poll cycle error: ${error.message}`);
+  } finally {
+    isRunning = false;
   }
 }
 
